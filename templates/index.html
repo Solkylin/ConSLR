@@ -1,0 +1,243 @@
+<!-- 连续手语识别系统前端 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=5">
+    <title>【润语无声】连续语句手语识别系统</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #a5dbca;/* 设置背景颜色 */
+            background-image: url('/static/under.png');/* 添加背景图片 */
+            background-size: cover;/* 确保背景图片覆盖整个页面 */
+            background-position: center;/* 图片居中显示 */
+            background-attachment: fixed;/* 背景图片不会随着页面滚动而滚动 */
+        }
+
+        #container {
+            text-align: center;
+            max-width: 90%;/* 设置最大宽度为屏幕宽度的90% */
+            background-color: #53ab97;/* 设置容器背景颜色 */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(112, 51, 51, 0.1);/* 添加阴影效果 */
+        }
+
+        #container {
+            text-align: center;
+            background-color: #53ab97; /* 设置容器背景颜色 */
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(112, 51, 51, 0.1); /* 添加阴影效果 */
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            margin-right: 10px;
+        }
+
+        #video_feed {
+            border-radius: 5px;
+            display: block; /* 默认隐藏视频 */
+        }
+
+        #placeholder_image {
+            display: none; /* 默认隐藏占位图 */
+            max-width: 640px; /* 设置图片最大宽度 */
+            max-height: 480px; /* 设置图片最大高度 */
+            border-radius: 5px;
+        }
+
+        /* 为文件输入按键设置样式 */
+        #file {
+            /* 设置字体大小 */
+            font-size: 20px;
+            /* 设置按键颜色 */
+            color: rgb(112, 110, 110);
+            /* 设置背景颜色 */
+            background-color: #bfd8d0;
+            /* 增加内边距使得按钮看起来更大 */
+            padding: 8px;
+            /* 设置边框圆角 */
+            border-radius: 5px;
+            /* 移除边框 */
+            border: none;
+            /* 设置光标为指针，更明显地指示这是一个可点击的按钮 */
+            cursor: pointer;
+        }
+        
+        /* 当鼠标悬停在按钮上时改变背景色和字体颜色 */
+        /* #file:hover {
+            background-color: navy;
+            color: yellow;
+        } */
+
+        /* 为提交按钮设置样式 */
+        input[type=submit] {
+            /* 设置字体大小 */
+            font-size: 20px; 
+            /* 设置字体颜色 */
+            color: rgb(0, 0, 0);
+            /* 设置背景颜色 */
+            background-color: #bfd8d0;
+            /* 增加内边距，使按钮更大 */
+            padding: 12px 24px;
+            /* 设置边框为圆角 */
+            border-radius: 8px;
+            /* 移除默认边框 */
+            border: none;
+            /* 添加轻微的阴影，为按钮增加立体感 */
+            box-shadow: 2px 2px 4px #888888;
+            /* 改变鼠标光标为指针 */
+            cursor: pointer;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <h1>连续手语识别</h1>
+        <h3>【润语无声】</h3>
+        <h5>上传一段包含手语的本地视频或录制视频，我们会将其转换成文字并显示在视频中。</h5>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="file" id="file">
+            <input type="submit" value="上传视频" name="submit">
+        </form>
+        <div class="buttons">
+            <button id="startScreenRecording">屏幕录制</button>
+            <button id="startCameraRecording">摄像头录制</button>
+            <button id="stopRecording" disabled>停止录制</button>
+        </div>
+        <img id="placeholder_image" src="/static/placeholder_image.png" alt="Placeholder Image" width="640" height="480" style="display: block;">
+        <video id="video_preview" width="640" height="480" controls style="display: none;"></video>
+        {% if message %}
+            <p>{{ message }}</p>
+        {% endif %}
+        {% if video_path %}
+            <img id="video_feed" src="{{ url_for('video_feed', video_path=video_path) }}" width="640" height="480" alt="Video Feed" style="display: block;">
+            
+        {% else %}
+            <img id="video_feed" style="display: none;">
+        {% endif %}
+    </div>
+    <script>
+        // 页面加载完成后立即执行的函数
+        window.onload = function() {
+            // 检查是否有video_path存在
+            const videoPath = "{{ video_path }}";
+            if (videoPath) {
+                // 如果有视频路径，显示视频流，隐藏占位图
+                document.getElementById('video_feed').style.display = 'block';
+                document.getElementById('placeholder_image').style.display = 'none';
+            } else {
+                // 如果没有视频路径，隐藏视频流，显示占位图
+                document.getElementById('video_feed').style.display = 'none';
+                document.getElementById('placeholder_image').style.display = 'block';
+            }
+        };
+    
+        let mediaRecorder;  // 用于视频录制的MediaRecorder实例
+        let recordedBlobs;  // 存储录制视频数据的数组
+        let activeStream = null;  // 用于保存当前活动的媒体流
+        const startScreenButton = document.getElementById('startScreenRecording');
+        const startCameraButton = document.getElementById('startCameraRecording');
+        const stopButton = document.getElementById('stopRecording');
+        const videoPreview = document.getElementById('video_preview');
+        const placeholderImage = document.getElementById('placeholder_image');
+    
+        function handleStartRecording(stream) {
+            activeStream = stream;  // 保存当前活动的媒体流
+            recordedBlobs = [];
+            mediaRecorder = new MediaRecorder(stream);
+            videoPreview.srcObject = stream;
+            videoPreview.style.display = 'block';
+            placeholderImage.style.display = 'none';
+    
+            // 处理数据可用事件，收集数据块
+            mediaRecorder.ondataavailable = function(event) {
+                if (event.data.size > 0) {
+                    recordedBlobs.push(event.data);
+                }
+            };
+    
+            // 处理停止录制事件
+            mediaRecorder.onstop = async function() {
+                const blob = new Blob(recordedBlobs, { type: 'video/webm' });
+                const videoURL = URL.createObjectURL(blob);
+                videoPreview.src = videoURL;
+                videoPreview.style.display = 'block';
+                placeholderImage.style.display = 'none';
+    
+                // 创建隐藏的<a>元素用于下载视频
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = videoURL;
+                a.download = 'recorded_video.webm';
+                document.body.appendChild(a);
+                a.click();
+                // 一段时间后删除创建的元素和释放URL对象
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(videoURL);  
+                }, 100);
+    
+                // 将视频文件上传到服务器
+                const formData = new FormData();
+                formData.append('file', blob, 'recorded_video.webm');
+                await fetch('/upload', { method: 'POST', body: formData });
+                stopButton.disabled = true;
+                startScreenButton.disabled = false;
+                startCameraButton.disabled = false;
+            };
+            mediaRecorder.start();
+            stopButton.disabled = false;
+            startScreenButton.disabled = true;
+            startCameraButton.disabled = true;
+        }
+    
+        // 开始屏幕录制按钮事件处理
+        startScreenButton.onclick = async () => {
+            const constraints = { video: true };
+            const stream = await navigator.mediaDevices.getDisplayMedia(constraints);
+            handleStartRecording(stream);
+        };
+    
+        // 开始摄像头录制按钮事件处理
+        startCameraButton.onclick = async () => {
+            const constraints = { video: true, audio: true };
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            handleStartRecording(stream);
+        };
+    
+        // 停止录制按钮事件处理
+        stopButton.onclick = () => {
+            mediaRecorder.stop();
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+                activeStream = null;
+            }
+            stopButton.disabled = true;
+            startScreenButton.disabled = false;
+            startCameraButton.disabled = false;
+        };
+    </script>    
+</body>
+</html>
