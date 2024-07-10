@@ -77,7 +77,7 @@ python CSL_Continuous_Seq2Seq.py
 
 ```
 
-## 注意事项
+## Notes
 - The project uses GPU by default. To run on CPU, modify the device configuration in `logits.py`.
 - For new sign language datasets, adjust the data loading and preprocessing methods in `dataset.py`.
 - When training models, ensure the dataset paths are correct and adjust model parameters as needed.
